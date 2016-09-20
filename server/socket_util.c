@@ -40,7 +40,7 @@ int create_server_socket(int port)
 
     /* Bind socket to server address */
     if(bind(sock,(struct sockaddr*) &server_address, sizeof(server_address)) < 0){
-        fprintf(stderr, "Cannot bind socket to address");
+        fprintf(stderr,"Cannot bind socket to address\n");
         exit(EXIT_FAILURE);
     }
 

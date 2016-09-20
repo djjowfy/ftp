@@ -43,10 +43,12 @@ int handles(const int sockfd){
 	 memcpy(sending_file.name,data,strlen(data)-2);
      snprintf(sending_file.abpath,sizeof(sending_file.abpath),"%s%s",sending_file.path,sending_file.name);
      download(sockfd,data_socket);
+     close(data_socket);
    }else if(check_response("STOR")){
 	 memcpy(sending_file.name,data,strlen(data)-2);
      snprintf(sending_file.abpath,sizeof(sending_file.abpath),"%s%s",sending_file.path,sending_file.name);
 	 update(sockfd,data_socket);
+         close(data_socket);
    }else{
 	   return -1;
    }
