@@ -1,0 +1,3 @@
+*.o
+ftp_server
+fip_client
