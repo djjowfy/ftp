@@ -30,7 +30,7 @@ struct simple_file{
 };
 #define REQIURE_PASS "331 User name okay,need password"
 #define TELL_LOGIN "230 User logged in proceed"
-#define PASV_RESPONSE "227 Entering passive mode(127,0,0,1,4,18)"
+#define PASV_RESPONSE "227 Entering passive mode(104,224,166,224,4,18)"
 #define CWD_RESPONSE "250 Command okay."
 #define SIZE_RESPONSE "213"
 #define RETR_RESPONSE "150 Opening data connection."
