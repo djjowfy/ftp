@@ -29,9 +29,9 @@ void recv_file(const int socketfd,const char *path){
   
     bzero(buffer, MAX_SIZE);  
     int recv_count;  
-    while(recv_count = recv(socketfd, buffer, MAX_SIZE, 0) > 0)  
+    while((recv_count = recv(socketfd, buffer, MAX_SIZE,0)) > 0)  
     {  
-        printf("recv count:%d",recv_count);
+        //printf("recv count:%d",recv_count);
         //recv_count = recv(socketfd, buffer, MAX_SIZE, 0);
         if(fwrite(buffer, sizeof(char), recv_count, fp) < recv_count)  
         {  
@@ -42,6 +42,7 @@ void recv_file(const int socketfd,const char *path){
     }
     printf("Receive File:\t%s From Server IP Successful!\n", file_name);  
     fclose(fp);  
+    close(socketfd);
 }
 
 int send_file(const int sockfd,const char *path){
@@ -71,5 +72,6 @@ FILE *fp = fopen(file_name, "r");
   
             fclose(fp);  
             printf("File:%s Transfer Successful!\n", file_name);  
-        }  
+        } 
+        close(sockfd);
 }  
