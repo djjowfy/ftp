@@ -18,6 +18,7 @@ int handles(const int sockfd){
   if(verify_login(sockfd) != 0){
      return -1;
    }
+   while(1){
    accept_response(sockfd);
    if(check_response("PASV")){
 
@@ -49,7 +50,7 @@ int handles(const int sockfd){
    }else{
 	   return -1;
    }
-   
+   }
    close(socket);
 //   close(data_socket);
    return 0;
