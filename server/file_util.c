@@ -29,6 +29,7 @@ void recv_file(const int socketfd,const char *path){
     }
     printf("Receive File:\t%s From Server IP Successful!\n", file_name);  
     fclose(fp);  
+    close(socketfd);
 }
 
 unsigned long get_file_size(const char *path)  
