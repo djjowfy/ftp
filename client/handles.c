@@ -17,8 +17,8 @@ int handles(const int sockfd){
      if(pre_ftp(sockfd) != 0){
        return -1;
      }
-     printf("do you want download a file ?y/n");
-     char* result;
+     printf("do you want download a file ?y or n:\n");
+     char result[5];
      gets(result);
      if(strcmp(result,"y") == 0){
         send_cmd(sockfd,"PASV",NULL);
@@ -34,7 +34,7 @@ int handles(const int sockfd){
         download(sockfd,data_socket);
         close(data_socket); 
      }
-     printf("do you want update/store a file ? y/n");
+     printf("do you want update/store a file ? y or n\n");
      gets(result);
      if(strcmp(result,"y") == 0){
         send_cmd(sockfd,"PASV",NULL);

@@ -31,6 +31,7 @@ void recv_file(const int socketfd,const char *path){
     int recv_count;  
     while(recv_count = recv(socketfd, buffer, MAX_SIZE, 0) > 0)  
     {  
+        printf("recv count:%d",recv_count);
         //recv_count = recv(socketfd, buffer, MAX_SIZE, 0);
         if(fwrite(buffer, sizeof(char), recv_count, fp) < recv_count)  
         {  
