@@ -13,14 +13,11 @@ int check_response(const char * corret);
 void send_cmd(const int sockfd,const char * cmd,char * data);
 void send_response(const int sockfd,const char * response,const char * data);
 int verify_login(const int sockfd);
-
+static int data_port = 1043;
 int handles(const int sockfd){
   if(verify_login(sockfd) != 0){
      return -1;
    }
-   struct sockaddr_in client_address;
-   int len = sizeof(client_address);
-   const int socket = create_server_socket(1042);
    while(1){
    accept_response(sockfd);
    if(check_response("PASV")){
@@ -29,7 +26,12 @@ int handles(const int sockfd){
     printf("PASV error");
      return -1;
    }
-   send_response(sockfd,PASV_RESPONSE,NULL);
+   struct sockaddr_in client_address;
+   int len = sizeof(client_address);
+   data_port ++;
+   const int socket = create_server_socket(data_port);
+   snprintf(buff,sizeof(buff),"%s%d%s%s%s",PASV_RESPONSE,data_port/256,",",data_port%256,")");
+   send_response(sockfd,buff,NULL);
    const int data_socket = accept(socket,(struct sockaddr*) &client_address,&len);
    accept_response(sockfd);
    if(!check_response("CWD")){

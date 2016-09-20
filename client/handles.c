@@ -138,15 +138,15 @@ int pre_ftp(const int sockfd){
   }
   printf("please input username : \n");
   gets(username);
-  send_cmd(sockfd,"USER",USERNAME);
+  send_cmd(sockfd,"USER",username);
   accept_response(sockfd);
   if(!check_response("331")){
     printf("user verify failed!!\n");
     return -2;
   }
-  send_cmd(sockfd,"PASS",PASSWORD);
   printf("please input password : \n");
   gets(password);
+  send_cmd(sockfd,"PASS",password);
   accept_response(sockfd);
   if(!check_response("230")){
     return -3;
