@@ -51,7 +51,7 @@ int handles(const int sockfd){
 	   return -1;
    }
    }
-   close(socket);
+   shutdown(socket,2);
 //   close(data_socket);
    return 0;
 }
