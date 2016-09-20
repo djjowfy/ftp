@@ -61,6 +61,7 @@ FILE *fp = fopen(file_name, "r");
             int length = 0;  
             while((length = fread(buffer, sizeof(char), MAX_SIZE, fp)) > 0)  
             {  
+                printf("%s\n",buffer);
                 if(send(sockfd, buffer, length, 0) < 0)  
                 {  
                     printf("Send File:%s Failed./n", file_name);  
