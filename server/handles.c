@@ -64,6 +64,9 @@ int handles(const int sockfd){
 }
 
 int update(const int sockfd,const int data_socket){
+   if(opendir(sending_file.path) == NULL){
+	   create_dir(sending_file.path);
+   }
    send_response(sockfd,RETR_RESPONSE,NULL);
    recv_file(data_socket,sending_file.abpath);
    return 0;
