@@ -44,13 +44,6 @@ int handles(const int sockfd){
 	   accept_response(sockfd);
 	   if(check_response("SIZE")){
 		    memcpy(sending_file.name,data,strlen(data)-2);
-			if ( access(sending_file.name,F_OK) != 0){
-				printf("flie %s not find",sending_file.name);
-				send_response(sockfd,ERR_RESPONSE,"not find file");
-				close(socket);
-				close(data_socket);
-				continue;
-			}
 		    snprintf(sending_file.abpath,sizeof(sending_file.abpath),"%s%s",sending_file.path,sending_file.name);
 		    download(sockfd,data_socket);
 	   }else if(check_response("STOR")){
@@ -77,6 +70,11 @@ int update(const int sockfd,const int data_socket){
 }
 
 int download(const int sockfd,const int data_socket){
+	if(access(sending_file.abpath,F_OK) != 0){
+		printf("flie %s not find",sending_file.abpath);
+		send_response(sockfd,ERR_RESPONSE,"not find file");
+        return -1;
+	}
    snprintf(sending_file.size,sizeof(sending_file.size),"%lu",get_file_size(sending_file.abpath));
    send_response(sockfd,SIZE_RESPONSE,sending_file.size);
    accept_response(sockfd);

@@ -61,6 +61,10 @@ int handles(const int sockfd){
 int update(const int sockfd,const int data_socket){
    printf("please input file dir\n");
    gets(recving_file.path);
+   if(NULL == opendir(recving_file.path)){
+     printf("dir not exit");
+     return -1;
+   }
    send_cmd(sockfd,"CWD",recving_file.path);
    accept_response(sockfd);
    if(check_response("250")){
@@ -68,9 +72,14 @@ int update(const int sockfd,const int data_socket){
      printf("server response CWD error");
      return -2;
    }
+
    printf("please input file name\n");
    gets(recving_file.name);
    snprintf(recving_file.abpath,sizeof(recving_file.abpath),"%s%s",recving_file.path,recving_file.name);
+   if(access(recving_file.abpath,F_OK) != 0){
+     printf("not exit the file \n");
+     return -1;
+   }
    send_cmd(sockfd,"STOR",recving_file.name);
    accept_response(sockfd);
    if(check_response("150")){
@@ -86,6 +95,9 @@ int download(const int sockfd,const int data_socket){
 	printf("please input file dir\n");
 	gets(recving_file.path);
 	send_cmd(sockfd,"CWD",recving_file.path);
+        if(NULL == opendir(recving_file.path)){
+         create_dir(recving_file.path);
+        }
 	accept_response(sockfd);
 	if(check_response("250")){
 	}else{
