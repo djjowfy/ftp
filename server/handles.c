@@ -44,7 +44,7 @@ int handles(const int sockfd){
 	   accept_response(sockfd);
 	   if(check_response("SIZE")){
 		    memcpy(sending_file.name,data,strlen(data)-2);
-			if ( !access(sending_file.name,0) ){
+			if ( access(sending_file.name,F_OK) != 0){
 				printf("flie %s not find",sending_file.name);
 				send_response(sockfd,ERR_RESPONSE,"not find file");
 				close(socket);
