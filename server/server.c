@@ -18,6 +18,7 @@ void server(int port)
        pthread_t pid;
        pthread_create(&pid,NULL,communication,(void *)connection);
     }
+   close(socket);
 }
 
 void* communication(void* connection_arg){

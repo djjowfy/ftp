@@ -14,41 +14,47 @@ int download(const int sockfd,const int data_socket);
 int update(const int sockfd,const int data_socket);
 
 int handles(const int sockfd){
-     if(pre_ftp(sockfd) != 0){
+    if(pre_ftp(sockfd) != 0){
        return -1;
-     }
-     printf("do you want download a file ?y or n:\n");
-     char result[5];
-     gets(result);
-     if(strcmp(result,"y") == 0){
-        send_cmd(sockfd,"PASV",NULL);
-        accept_response(sockfd);
-        if(check_response("227")){
-     
-        }else{
-           printf("server response PASV error");
-           return -2;
-        }
-        get_ipaddr();
-        const int data_socket = create_client_socket(data_ip.ip,data_ip.port);
-        download(sockfd,data_socket);
-        close(data_socket); 
-     }
-     printf("do you want update/store a file ? y or n\n");
-     gets(result);
-     if(strcmp(result,"y") == 0){
-        send_cmd(sockfd,"PASV",NULL);
-        accept_response(sockfd);
-        if(check_response("227")){
-        }else{
-         printf("server response PASV error");
-         return -2;
-        }
-       get_ipaddr();
-       const int data_socket = create_client_socket(data_ip.ip,data_ip.port);
-       update(sockfd,data_socket);
-       close(data_socket);
-   }
+    }
+	while(1){
+		printf("do you want download a file ?y or n or q :\n");
+		char result[5];
+		gets(result);
+		 if(strcmp(result,"y") == 0){
+			send_cmd(sockfd,"PASV",NULL);
+			accept_response(sockfd);
+			if(check_response("227")){
+		 
+			}else{
+			   printf("server response PASV error");
+			   return -2;
+			}
+			get_ipaddr();
+			const int data_socket = create_client_socket(data_ip.ip,data_ip.port);
+			download(sockfd,data_socket);
+			close(data_socket); 
+		 }else if(strcmp(result,"q") == 0){
+			 return 0;
+		 }
+		 printf("do you want update/store a file ? y or n or q :\n");
+		 gets(result);
+		 if(strcmp(result,"y") == 0){
+			send_cmd(sockfd,"PASV",NULL);
+			accept_response(sockfd);
+			if(check_response("227")){
+			}else{
+			 printf("server response PASV error");
+			 return -2;
+			}
+		   get_ipaddr();
+		   const int data_socket = create_client_socket(data_ip.ip,data_ip.port);
+		   update(sockfd,data_socket);
+		   close(data_socket);
+		}else if(strcmp(result,"q") == 0){
+			 return 0;
+		 }
+    } 
    return 0;
 }
 

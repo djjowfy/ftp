@@ -19,45 +19,46 @@ int handles(const int sockfd){
      return -1;
    }
    while(1){
-   accept_response(sockfd);
-   if(check_response("PASV")){
+	   accept_response(sockfd);
+	   if(check_response("PASV")){
 
-   }else{
-    printf("PASV error");
-     return -1;
+	   }else{
+			printf("PASV error");
+			return -1;
+	   }
+	   struct sockaddr_in client_address;
+	   int len = sizeof(client_address);
+	   data_port ++;
+	   const int socket = create_server_socket(data_port);
+	   snprintf(buff,sizeof(buff),"%s%d%s%d%s",PASV_RESPONSE,data_port/256,",",data_port%256,")");
+	   send_response(sockfd,buff,NULL);
+	   const int data_socket = accept(socket,(struct sockaddr*) &client_address,&len);
+	   accept_response(sockfd);
+	   if(!check_response("CWD")){
+			printf("CWD error");
+			return -1;
+	   }
+	   memcpy(sending_file.path,data,strlen(data)-2);
+	   send_response(sockfd,CWD_RESPONSE,NULL);
+	   accept_response(sockfd);
+	   if(check_response("SIZE")){
+		    memcpy(sending_file.name,data,strlen(data)-2);
+		    snprintf(sending_file.abpath,sizeof(sending_file.abpath),"%s%s",sending_file.path,sending_file.name);
+		    download(sockfd,data_socket);
+	   }else if(check_response("STOR")){
+			memcpy(sending_file.name,data,strlen(data)-2);
+			printf("%s\n",sending_file.name);
+			snprintf(sending_file.abpath,sizeof(sending_file.abpath),"%s%s",sending_file.path,sending_file.name);
+			update(sockfd,data_socket);
+	   }else{
+		   	close(socket);
+		    close(data_socket);
+		    return -1;
+	   }
+	    close(socket);
+		close(data_socket);
    }
-   struct sockaddr_in client_address;
-   int len = sizeof(client_address);
-   data_port ++;
-   const int socket = create_server_socket(data_port);
-   snprintf(buff,sizeof(buff),"%s%d%s%s%s",PASV_RESPONSE,data_port/256,",",data_port%256,")");
-   send_response(sockfd,buff,NULL);
-   const int data_socket = accept(socket,(struct sockaddr*) &client_address,&len);
-   accept_response(sockfd);
-   if(!check_response("CWD")){
-     printf("CWD error");
-     return -1;
-   }
-   memcpy(sending_file.path,data,strlen(data)-2);
-   send_response(sockfd,CWD_RESPONSE,NULL);
-   accept_response(sockfd);
-   if(check_response("SIZE")){
-	 memcpy(sending_file.name,data,strlen(data)-2);
-     snprintf(sending_file.abpath,sizeof(sending_file.abpath),"%s%s",sending_file.path,sending_file.name);
-     download(sockfd,data_socket);
-     close(data_socket);
-   }else if(check_response("STOR")){
-	 memcpy(sending_file.name,data,strlen(data)-2);
-    printf("%s\n",sending_file.name);
-     snprintf(sending_file.abpath,sizeof(sending_file.abpath),"%s%s",sending_file.path,sending_file.name);
-	 update(sockfd,data_socket);
-         close(data_socket);
-   }else{
-	   return -1;
-   }
-   }
-   shutdown(socket,2);
-//   close(data_socket);
+   close(sockfd);
    return 0;
 }
 
