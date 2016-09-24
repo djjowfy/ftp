@@ -83,37 +83,39 @@ int update(const int sockfd,const int data_socket){
 }
 
 int download(const int sockfd,const int data_socket){
-   printf("please input file dir\n");
-   gets(recving_file.path);
-   send_cmd(sockfd,"CWD",recving_file.path);
-   accept_response(sockfd);
-   if(check_response("250")){
-   }else{
-     printf("server response CWD error");
-     return -2;
-   }
-   printf("please input file name\n");
-   gets(recving_file.name);
-      snprintf(recving_file.abpath,sizeof(recving_file.abpath),"%s%s",recving_file.path,recving_file.name);
-   send_cmd(sockfd,"SIZE",recving_file.name);
-   accept_response(sockfd);
-   if(check_response("213")){
-   }else{
-     printf("server response SIZE error");
-     return -2;
-   }
-   char * data;
-   strtok_r(buff," ",&data);
-   send_cmd(sockfd,"RETR",recving_file.abpath);
-   accept_response(sockfd);
-   if(check_response("150")){
-   }else{
-     printf("server response RETR error");
-     return -2;
-   }
-
-   recv_file(data_socket,recving_file.abpath);
-   return 0;
+	printf("please input file dir\n");
+	gets(recving_file.path);
+	send_cmd(sockfd,"CWD",recving_file.path);
+	accept_response(sockfd);
+	if(check_response("250")){
+	}else{
+	 printf("server response CWD error");
+	 return -2;
+	}
+	printf("please input file name\n");
+	gets(recving_file.name);
+	snprintf(recving_file.abpath,sizeof(recving_file.abpath),"%s%s",recving_file.path,recving_file.name);
+	send_cmd(sockfd,"SIZE",recving_file.name);
+	accept_response(sockfd);
+	if(check_response("213")){
+	}else{
+	 printf("server response SIZE error");
+	 return -2;
+	}
+	char * data;
+	strtok_r(buff," ",&data);
+	send_cmd(sockfd,"RETR",recving_file.abpath);
+	accept_response(sockfd);
+	if(check_response("150")){
+	}else if(check_response("500")){
+	    printf("the file not exit in server");
+		return -2;
+	}else{
+		printf("server response RETR error");
+		return -2;
+	}
+	recv_file(data_socket,recving_file.abpath);
+	return 0;
 }
 
 void get_ipaddr(void){

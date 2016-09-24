@@ -36,4 +36,5 @@ struct simple_file{
 #define CWD_RESPONSE "250 Command okay."
 #define SIZE_RESPONSE "213"
 #define RETR_RESPONSE "150 Opening data connection."
+#define ERR_RESPONSE "500"
 #endif
