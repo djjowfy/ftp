@@ -16,6 +16,7 @@ int verify_login(const int sockfd);
 static int data_port = 1043;
 int handles(const int sockfd){
   if(verify_login(sockfd) != 0){
+    close(sockfd);
      return -1;
    }
    while(1){
@@ -86,6 +87,7 @@ int verify_login(const int sockfd){
    printf("username %s",data);
    client_user.name = (char *)malloc(sizeof(char)*(strlen(data) - 2));
    memcpy(client_user.name,data,strlen(data) - 2);
+   if(strcmp(client_user.name,USERNAME) != 0)return -1;
   }else{
    printf("username error");
    free(client_user.name);
@@ -98,6 +100,7 @@ int verify_login(const int sockfd){
     printf("password %s",data);
     client_user.password = (char *)malloc(sizeof(char) * (strlen(data) - 2));
     memcpy(client_user.password,data,strlen(data) -  2);
+    if(strcmp(client_user.password,PASSWORD)!=0)return -1;
   }else{
     free(client_user.password);
     client_user.password = NULL;

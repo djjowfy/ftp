@@ -18,6 +18,8 @@
 
 #define FILE_NAME_MAX_SIZE 512
 #define MAX_SIZE 1024
+#define USERNAME "djjowfy"
+#define PASSWORD "djjowfy"
 struct user{
   char * name;
   char * password;
