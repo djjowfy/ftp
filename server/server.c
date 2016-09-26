@@ -22,7 +22,7 @@ void server(int port)
 }
 
 void* communication(void* connection_arg){
-    char welcome[] = "220 weclome";
+    char welcome[] = "220 weclome\r\n";
     int connection = *(int *)connection_arg;
     write(connection,welcome,strlen(welcome));
     handles(connection);

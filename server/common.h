@@ -30,8 +30,8 @@ struct simple_file{
   char abpath[FILE_NAME_MAX_SIZE*2];
   char size[100];
 };
-#define REQIURE_PASS "331 User name okay,need password"
-#define TELL_LOGIN "230 User logged in proceed"
+#define REQIURE_PASS "331 User name okay,need password\r\n"
+#define TELL_LOGIN "230 User logged in proceed\r\n"
 #define PASV_RESPONSE "227 Entering passive mode(104,224,166,224,"
 #define CWD_RESPONSE "250 Command okay."
 #define SIZE_RESPONSE "213"
