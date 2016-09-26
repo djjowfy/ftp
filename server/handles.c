@@ -132,7 +132,8 @@ void send_response(const int sockfd,const char* response,const char* data){
    char sendbuff[1024];
    if(data == NULL){
       printf("%s\n",response);
-      write(sockfd,response,strlen(response));
+      snprintf(sendbuff,sizeof(sendbuff),"%s\r\n",response);
+      write(sockfd,sendbuff,strlen(sendbuff));
    }else{
      snprintf(sendbuff,sizeof(sendbuff),"%s%s%s\r\n",response," ",data);
      printf("%s\n",sendbuff);
