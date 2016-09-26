@@ -117,6 +117,13 @@ int verify_login(const int sockfd){
     return -2;
   }
   send_response(sockfd,TELL_LOGIN,NULL);
+  accept_response(sockfd);
+  if(check_response("SYST")){
+    
+  }else{
+    return -2;
+  }
+ send_response(sockfd,SYST_RESPONSE,NULL);
   return 0;
 
 }
@@ -127,7 +134,7 @@ void send_response(const int sockfd,const char* response,const char* data){
       printf("%s\n",response);
       write(sockfd,response,strlen(response));
    }else{
-     snprintf(sendbuff,sizeof(sendbuff),"%s%s%s",response," ",data);
+     snprintf(sendbuff,sizeof(sendbuff),"%s%s%s\r\n",response," ",data);
      printf("%s\n",sendbuff);
      write(sockfd,sendbuff,strlen(sendbuff));
    }
