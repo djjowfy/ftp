@@ -87,7 +87,7 @@ int send_file(const int sockfd,const char *path){
         char file_name[FILE_NAME_MAX_SIZE+1];  
         bzero(file_name, FILE_NAME_MAX_SIZE+1);  
         strncpy(file_name, path, strlen(path)>FILE_NAME_MAX_SIZE?FILE_NAME_MAX_SIZE:strlen(path));  
-        printf("%s\n", file_name); 
+        printf("send file %s\n", file_name); 
 FILE *fp = fopen(file_name, "r");  
         if(NULL == fp)  
         {  

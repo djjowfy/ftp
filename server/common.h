@@ -47,6 +47,7 @@ typedef struct ftp_session
 	int pasv_listen_fd;
 	int data_fd;
 	char data_buffer[MAX_FILE_COUNT*MAX_ARG];
+    char data_buff[MAX_ARG];
 	
 	//状态
 	int is_login;//登陆为1 

@@ -336,15 +336,16 @@ static void retrCmdHandler(session_t * const session){
 			return;
 		}
 	}
-
-	sendCtrlResponse(session,FTP_DATACONN," Here comes the file data.");
+    strcpy(session->data_buff,session->arg);
 	pthread_t pid;
 	pthread_create(&pid,NULL,sendFile,(void *)session);
+	sendCtrlResponse(session,FTP_DATACONN," Here comes the file data.");
 }
 
 void* sendFile(void* session){
 	session_t *sess = session;
-	if(send_file(sess->data_fd,sess->arg) == -1 ){
+    printf("file name:%s\n",sess->data_buff);
+	if(send_file(sess->data_fd,sess->data_buff) == -1 ){
 		sendCtrlResponse(sess,FTP_FILEFAIL,"cannot return the file");
 	}else{
 		sendCtrlResponse(sess,FTP_TRANSFEROK,"trans ok");
@@ -353,6 +354,7 @@ void* sendFile(void* session){
 	close(sess->pasv_listen_fd);
 	sess->data_fd = -1;
 	sess->pasv_listen_fd = -1;
+    memset(sess->data_buff,0,sizeof(sess->data_buff));
     return NULL;
 }
 
