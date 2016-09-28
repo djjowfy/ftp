@@ -205,6 +205,8 @@ static void pwdCmdHandler(session_t * const session){
 		return;
 	}
 	char text[MAX_ARG + 2] = {0};
+    memset(session->work_path,0,sizeof(session->work_path));
+   // strcpy(session->work_path,"/etc/share/");
 	getcwd(session->work_path, MAX_ARG - 1);//得到现在的工作路径
 	snprintf(text,sizeof(text),"\"%s\"",session->work_path);
 	sendCtrlResponse(session,FTP_PWDOK,text);
@@ -223,7 +225,10 @@ static void cwdCmdHandler(session_t * const session){
 		sendCtrlResponse(session,FTP_LOGINERR,"please login first");
 		return;
 	}
-	chroot(session->arg);
+    if(chdir(session->arg) < 0){
+        sendCtrlResponse(session,FTP_FILEFAIL,"can not change the directory");
+        return;
+    }
 	sendCtrlResponse(session,FTP_CWDOK,"Command okay");
 }
 static void sizeCmdHandler(session_t * const session){

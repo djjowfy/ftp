@@ -55,7 +55,7 @@ typedef struct ftp_session
 }session_t;
 
 #define SYST_RESPONSE "UNIX Type: L8"
-#define PASV_RESPONSE "Entering passive mode(127,0,0,1,"
+#define PASV_RESPONSE "Entering passive mode(104,224,166,224,"
 #define CWD_RESPONSE "250 Command okay."
 #define SIZE_RESPONSE "213"
 #define RETR_RESPONSE "150 Opening data connection."

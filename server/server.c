@@ -23,7 +23,7 @@ void server(int port)
 			/* 状态 */
 			0,0,"/"
 	};
-	chroot("/etc/share/");
+	chdir("/etc/share/");
     while(1){
 
        int connection = accept(socket,(struct sockaddr*) &client_address,&len);
