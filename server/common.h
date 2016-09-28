@@ -17,7 +17,11 @@
 #include <dirent.h>
 
 #define FILE_NAME_MAX_SIZE 512
+#define MAX_COMMAND_LINE 1024
+#define MAX_COMMAND 32
+#define MAX_ARG 1024
 #define MAX_SIZE 1024
+#define MAX_FILE_COUNT 512 //最多文件文件夹数目
 #define USERNAME "djjowfy"
 #define PASSWORD "djjowfy"
 struct user{
@@ -30,10 +34,28 @@ struct simple_file{
   char abpath[FILE_NAME_MAX_SIZE*2];
   char size[100];
 };
-#define REQIURE_PASS "331 User name okay,need password"
-#define TELL_LOGIN "230 User logged in proceed"
-#define SYST_RESPONSE "215 UNIX Type: L8"
-#define PASV_RESPONSE "227 Entering passive mode(104,224,166,224,"
+
+typedef struct ftp_session
+{
+	// 控制连接
+	int ctrl_fd;//命令socket
+	char cmdline[MAX_COMMAND_LINE];//接收到的命令行（命令 + 参数）
+	char cmd[MAX_COMMAND];//接受到的cmd
+	char arg[MAX_ARG];//接收到的cmd所带的参数
+
+	// 数据连接
+	int pasv_listen_fd;
+	int data_fd;
+	char data_buffer[MAX_FILE_COUNT*MAX_ARG];
+	
+	//状态
+	int is_login;//登陆为1 
+    int type;//0 ascii 1 EBCDIC 2 EBCDIC 3 local format
+	char work_path[MAX_ARG];//当前路径
+}session_t;
+
+#define SYST_RESPONSE "UNIX Type: L8"
+#define PASV_RESPONSE "Entering passive mode(127,0,0,1,"
 #define CWD_RESPONSE "250 Command okay."
 #define SIZE_RESPONSE "213"
 #define RETR_RESPONSE "150 Opening data connection."
