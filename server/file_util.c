@@ -91,7 +91,8 @@ int send_file(const int sockfd,const char *path){
 FILE *fp = fopen(file_name, "r");  
         if(NULL == fp)  
         {  
-            printf("File:%s Not Found\n", file_name);  
+            printf("File:%s Not Found\n", file_name); 
+			return -1;
         }  
         else  
         {  
@@ -102,13 +103,14 @@ FILE *fp = fopen(file_name, "r");
                 if(send(sockfd, buffer, length, 0) < 0)  
                 {  
                     printf("Send File:%s Failed./n", file_name);  
+					fclose(fp);
+					return -1;
                     break;  
                 }  
                 bzero(buffer, MAX_SIZE);  
             }  
-  
             fclose(fp);  
             printf("File:%s Transfer Successful!\n", file_name);  
         } 
-        shutdown(sockfd,2);
+        return 0;
 }  

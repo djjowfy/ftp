@@ -28,6 +28,7 @@ typedef struct ftpcmd
 
 void* waitDataConnection(void* session);
 void* sendFileDir(void* session);
+void* sendFile(void* session);
 static void clearSessionCtrlData(session_t * const session);
 static void acceptResponse(session_t * const session);
 static void sendCtrlResponse(session_t * const session,const int response_code,const char* data);
@@ -42,6 +43,7 @@ static void listCmdHandler(session_t * const session);
 static void sizeCmdHandler(session_t * const session);
 static void cwdCmdHandler(session_t * const session);
 static void quitCmdHandler(session_t * const session);
+static void retrCmdHandler(session_t * const session);
 void sendData(session_t * const session);
 
 //from https://zh.wikipedia.org/wiki/FTP%E5%91%BD%E4%BB%A4%E5%88%97%E8%A1%A8
@@ -84,7 +86,7 @@ static ftpcmd_t ctrl_cmds[] = {
 	{"QUIT",quitCmdHandler},//断开连接
 	{"REIN",NULL},//重新初始化连接
 	{"REST",NULL},//从指定点重新开始传输
-	{"RETR",NULL},//传输文件副本
+	{"RETR",retrCmdHandler},//传输文件副本
 	{"RMD",NULL},//删除目录
 	{"RNFR",NULL},//从...重命名
 	{"RNTO",NULL},//重命名到...
@@ -317,6 +319,41 @@ static void listCmdHandler(session_t * const session){
 		pthread_create(&pid,NULL,sendFileDir,(void *)session);
 	}
 	
+}
+
+static void retrCmdHandler(session_t * const session){
+	if(session->is_login == 0){
+		sendCtrlResponse(session,FTP_LOGINERR,"please login first");
+		return;
+	}
+	struct timeval tv;   
+    gettimeofday(&tv, NULL);    
+    long now_time = tv.tv_sec;
+	while(session->data_fd == -1){
+		gettimeofday(&tv, NULL);
+		if(((tv.tv_sec) - now_time) > 30){//等待30s
+			sendCtrlResponse(session,FTP_DATATLSBAD," data sockect is not working well");
+			return;
+		}
+	}
+
+	sendCtrlResponse(session,FTP_DATACONN," Here comes the file data.");
+	pthread_t pid;
+	pthread_create(&pid,NULL,sendFile,(void *)session);
+}
+
+void* sendFile(void* session){
+	session_t *sess = session;
+	if(send_file(sess->data_fd,sess->arg) == -1 ){
+		sendCtrlResponse(sess,FTP_FILEFAIL,"cannot return the file");
+	}else{
+		sendCtrlResponse(sess,FTP_TRANSFEROK,"trans ok");
+	}	
+	close(sess->data_fd);
+	close(sess->pasv_listen_fd);
+	sess->data_fd = -1;
+	sess->pasv_listen_fd = -1;
+    return NULL;
 }
 
 void sendData(session_t * const session){
