@@ -34,6 +34,7 @@
 #define FTP_PBSZOK            200
 #define FTP_PROTOK            200
 #define FTP_OPTSOK            200
+#define FTP_SITECMDOK         200
 #define FTP_ALLOOK            202
 #define FTP_FEAT              211
 #define FTP_STATOK            211

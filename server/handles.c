@@ -29,9 +29,12 @@ typedef struct ftpcmd
 void* waitDataConnection(void* session);
 void* sendFileDir(void* session);
 void* sendFile(void* session);
+void* recvFile(void* session);
+
 static void clearSessionCtrlData(session_t * const session);
 static void acceptResponse(session_t * const session);
 static void sendCtrlResponse(session_t * const session,const int response_code,const char* data);
+
 static void userCmdHandler(session_t * const session);
 static void passCmdHandler(session_t * const session);
 static void pasvCmdHandler(session_t * const session);
@@ -44,7 +47,9 @@ static void sizeCmdHandler(session_t * const session);
 static void cwdCmdHandler(session_t * const session);
 static void quitCmdHandler(session_t * const session);
 static void retrCmdHandler(session_t * const session);
-void sendData(session_t * const session);
+static void storCmdHandler(session_t * const session);
+static void siteCmdHandler(session_t * const session);
+static void cdupCmdHandler(session_t * const session);
 
 //from https://zh.wikipedia.org/wiki/FTP%E5%91%BD%E4%BB%A4%E5%88%97%E8%A1%A8
 static ftpcmd_t ctrl_cmds[] = {
@@ -55,7 +60,7 @@ static ftpcmd_t ctrl_cmds[] = {
 	{"APPE",NULL},//增加
 	{"AUTH",NULL},//认证/安全机制
 	{"CCC",NULL},//清除命令通道
-	{"CDUP",NULL},//改变到父目录
+	{"CDUP",cdupCmdHandler},//改变到父目录
 	{"CONF",NULL},//机密性保护命令
 	{"CWD",cwdCmdHandler},//改变工作目录
 	{"DELE",NULL},//删除文件
@@ -90,11 +95,11 @@ static ftpcmd_t ctrl_cmds[] = {
 	{"RMD",NULL},//删除目录
 	{"RNFR",NULL},//从...重命名
 	{"RNTO",NULL},//重命名到...
-	{"SITE",NULL},//发送站点特殊命令到远端服务器
+	{"SITE",siteCmdHandler},//发送站点特殊命令到远端服务器
 	{"SIZE",sizeCmdHandler},//返回文件大小
 	{"SMNT",NULL},//挂载文件结构
 	{"STAT",NULL},//返回当前状态
-	{"STOR",NULL},//接收数据并且在服务器站点保存为文件
+	{"STOR",storCmdHandler},//接收数据并且在服务器站点保存为文件
 	{"STOU",NULL},//唯一地保存文件
 	{"STRU",NULL},//设定文件传输结构
 	{"SYST",systCmdHandler},//返回系统类型
@@ -208,7 +213,6 @@ static void pwdCmdHandler(session_t * const session){
 	}
 	char text[MAX_ARG + 2] = {0};
     memset(session->work_path,0,sizeof(session->work_path));
-   // strcpy(session->work_path,"/etc/share/");
 	getcwd(session->work_path, MAX_ARG - 1);//得到现在的工作路径
 	snprintf(text,sizeof(text),"\"%s\"",session->work_path);
 	sendCtrlResponse(session,FTP_PWDOK,text);
@@ -233,6 +237,19 @@ static void cwdCmdHandler(session_t * const session){
     }
 	sendCtrlResponse(session,FTP_CWDOK,"Command okay");
 }
+
+static void cdupCmdHandler(session_t * const session){
+	if(session->is_login == 0){
+		sendCtrlResponse(session,FTP_LOGINERR,"please login first");
+		return;
+	}
+    if(chdir("..") < 0){
+        sendCtrlResponse(session,FTP_FILEFAIL,"can not change the directory");
+        return;
+    }
+	sendCtrlResponse(session,FTP_CWDOK,"Command okay");
+}
+
 static void sizeCmdHandler(session_t * const session){
 	if(session->is_login == 0){
 		sendCtrlResponse(session,FTP_LOGINERR,"please login first");
@@ -288,8 +305,30 @@ static void mkdCmdHandler(session_t * const session){
 		sendCtrlResponse(session,FTP_FILEFAIL,"Create direction operator failed");
 	}else{
 		char buff[1024] = {0};
-	    snprintf(buff,sizeof(buff),"\"%s\"",session->arg);
+	    snprintf(buff,sizeof(buff),"\"%s/%s\" created",session->work_path,session->arg);
 		sendCtrlResponse(session,FTP_MKDIROK,buff);
+	}
+	
+}
+
+static void siteCmdHandler(session_t * const session){
+	if(session->is_login == 0){
+		sendCtrlResponse(session,FTP_LOGINERR,"please login first");
+		return;
+	}
+	char *left;
+	left = session->arg;
+	while((*left) != ' '){
+		*left = tolower(*left);
+		left ++;
+	}
+	int ret = system(session->arg);
+	if(ret == -1){
+		sendCtrlResponse(session, FTP_BADSTRU,"fork error");
+	}else if(ret == 127){
+		sendCtrlResponse(session,FTP_BADCMD,"command error");
+	}else{
+		sendCtrlResponse(session,FTP_SITECMDOK,"command OK");
 	}
 	
 }
@@ -299,6 +338,7 @@ static void listCmdHandler(session_t * const session){
 		sendCtrlResponse(session,FTP_LOGINERR,"please login first");
 		return;
 	}
+	strcpy(session->data_buff,session->arg);
 	struct timeval tv;   
     gettimeofday(&tv, NULL);    
     long now_time = tv.tv_sec;
@@ -306,19 +346,33 @@ static void listCmdHandler(session_t * const session){
 		gettimeofday(&tv, NULL);
 		if(((tv.tv_sec) - now_time) > 30){//等待30s
 			sendCtrlResponse(session,FTP_DATATLSBAD," data sockect is not working well");
+			memset(session->data_buff,0,sizeof(session->data_buff));
+			if((session->pasv_listen_fd) != -1){
+				close(session->pasv_listen_fd);
+			}
 			return;
 		}
-	}
+	}	
+
+	pthread_t pid;
+	pthread_create(&pid,NULL,sendFileDir,(void *)session);
 	sendCtrlResponse(session,FTP_DATACONN," Here comes the directory listing.");
 	
-	memset(session->data_buffer,0,sizeof(session->data_buffer));
-	if(listDir(session->arg,session->data_buffer,session->work_path) == -1){
-		sendCtrlResponse(session,FTP_FILEFAIL,"cannot list the directory");
+}
+
+void* sendFileDir(void* session){
+	session_t *sess = session;
+	if(listDir(sess) == -1 ){
+		sendCtrlResponse(sess,FTP_FILEFAIL,"cannot list the directory");
 	}else{
-		pthread_t pid;
-		pthread_create(&pid,NULL,sendFileDir,(void *)session);
-	}
-	
+		sendCtrlResponse(sess,FTP_TRANSFEROK,"trans ok");
+	}	
+	close(sess->data_fd);
+	close(sess->pasv_listen_fd);
+	sess->data_fd = -1;
+	sess->pasv_listen_fd = -1;
+	memset(sess->data_buff,0,sizeof(sess->data_buff));
+    return NULL;
 }
 
 static void retrCmdHandler(session_t * const session){
@@ -326,6 +380,7 @@ static void retrCmdHandler(session_t * const session){
 		sendCtrlResponse(session,FTP_LOGINERR,"please login first");
 		return;
 	}
+	strcpy(session->data_buff,session->arg);
 	struct timeval tv;   
     gettimeofday(&tv, NULL);    
     long now_time = tv.tv_sec;
@@ -333,10 +388,13 @@ static void retrCmdHandler(session_t * const session){
 		gettimeofday(&tv, NULL);
 		if(((tv.tv_sec) - now_time) > 30){//等待30s
 			sendCtrlResponse(session,FTP_DATATLSBAD," data sockect is not working well");
+			memset(session->data_buff,0,sizeof(session->data_buff));
+			if(session->pasv_listen_fd != -1){
+				close(session->pasv_listen_fd);
+			}
 			return;
 		}
 	}
-    strcpy(session->data_buff,session->arg);
 	pthread_t pid;
 	pthread_create(&pid,NULL,sendFile,(void *)session);
 	sendCtrlResponse(session,FTP_DATACONN," Here comes the file data.");
@@ -344,7 +402,6 @@ static void retrCmdHandler(session_t * const session){
 
 void* sendFile(void* session){
 	session_t *sess = session;
-    printf("file name:%s\n",sess->data_buff);
 	if(send_file(sess->data_fd,sess->data_buff) == -1 ){
 		sendCtrlResponse(sess,FTP_FILEFAIL,"cannot return the file");
 	}else{
@@ -358,26 +415,52 @@ void* sendFile(void* session){
     return NULL;
 }
 
-void sendData(session_t * const session){
-	write(session->data_fd,session->data_buffer,strlen(session->data_buffer));
+static void storCmdHandler(session_t * const session){
+	if(session->is_login == 0){
+		sendCtrlResponse(session,FTP_LOGINERR,"please login first");
+		return;
+	}
+	strcpy(session->data_buff,session->arg);
+	struct timeval tv;   
+    gettimeofday(&tv, NULL);    
+    long now_time = tv.tv_sec;
+	while(session->data_fd == -1){
+		gettimeofday(&tv, NULL);
+		if(((tv.tv_sec) - now_time) > 30){//等待30s
+			sendCtrlResponse(session,FTP_DATATLSBAD," data sockect is not working well");
+			memset(session->data_buff,0,sizeof(session->data_buff));
+			if((session->pasv_listen_fd) != -1){
+				close(session->pasv_listen_fd);
+			}
+			return;
+		}
+	}
+	pthread_t pid;
+	pthread_create(&pid,NULL,recvFile,(void *)session);
+	sendCtrlResponse(session,FTP_DATACONN," Here is ready");
 }
 
-void* sendFileDir(void* session){
+void* recvFile(void* session){
 	session_t *sess = session;
-	sendData(sess);
-	printf("data_socket %d\n %s",sess->data_fd,sess->data_buffer);
+	if(recv_file(sess->data_fd,sess->data_buff) == -1 ){
+		sendCtrlResponse(sess,FTP_FILEFAIL,"cannot return the file");
+	}else{
+		sendCtrlResponse(sess,FTP_TRANSFEROK,"trans ok");
+	}	
 	close(sess->data_fd);
 	close(sess->pasv_listen_fd);
 	sess->data_fd = -1;
 	sess->pasv_listen_fd = -1;
-	sendCtrlResponse(session,FTP_TRANSFEROK," list the directory");
+    memset(sess->data_buff,0,sizeof(sess->data_buff));
     return NULL;
 }
+
 
 int handles(session_t * const session){
 	int i;
 	const int size = sizeof(ctrl_cmds) / sizeof(ctrl_cmds[0]);
 	printf("%d",size);
+	memset(session->data_buff,0,sizeof(session->data_buff));
 	while(1){
 		clearSessionCtrlData(session);
 		acceptResponse(session);

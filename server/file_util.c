@@ -25,7 +25,7 @@ int create_dir(const char *sPathName)
       if(DirName[i]=='/')  
       {  
         DirName[i]   =   0;  
-       if(access(DirName,   NULL)!=0)  
+       if(access(DirName,F_OK)!=0)  
        {  
           if(mkdir(DirName, 0755)==-1)  
           {   
@@ -51,7 +51,7 @@ unsigned long get_file_size(const char *path)
     return filesize;  
 }
 
-void recv_file(const int socketfd,const char *path){
+int recv_file(const int socketfd,const char *path){
     char buffer[MAX_SIZE];
     char file_name[FILE_NAME_MAX_SIZE+1];
     bzero(file_name, FILE_NAME_MAX_SIZE+1);
@@ -61,25 +61,24 @@ void recv_file(const int socketfd,const char *path){
     if(NULL == fp)  
     {  
         printf("File:\t%s Can Not Open To Write\n",file_name);  
-        exit(1);  
+        return -1;  
     }  
   
     bzero(buffer, MAX_SIZE);  
     int recv_count;  
     while((recv_count = recv(socketfd, buffer, MAX_SIZE,0)) > 0)  
     {  
-        //printf("recv count:%d",recv_count);
-        //recv_count = recv(socketfd, buffer, MAX_SIZE, 0);
         if(fwrite(buffer, sizeof(char), recv_count, fp) < recv_count)  
         {  
             printf("File:\t%s Write Failed\n", file_name);  
-            break;  
+			fclose(fp);
+			return -1;  
         }  
         bzero(buffer, MAX_SIZE);  
     }
     printf("Receive File:\t%s From Server IP Successful!\n", file_name);  
     fclose(fp);  
-    shutdown(socketfd,2);
+	return 0;
 }
 
 int send_file(const int sockfd,const char *path){

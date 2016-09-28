@@ -33,6 +33,16 @@ void strUpper(char *str)
 	}
 }
 
+void strLower(char *str)
+{
+	int i,count = strlen(str);
+	for(i = 0;i < count;i ++)
+	{
+		*str = tolower(*str);
+		str++;
+	}
+}
+
 void strTrimCrlf(char *str)
 {
 	char *p = &str[strlen(str)-1];

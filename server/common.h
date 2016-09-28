@@ -46,17 +46,17 @@ typedef struct ftp_session
 	// 数据连接
 	int pasv_listen_fd;
 	int data_fd;
-	char data_buffer[MAX_FILE_COUNT*MAX_ARG];
     char data_buff[MAX_ARG];
 	
 	//状态
 	int is_login;//登陆为1 
     int type;//0 ascii 1 EBCDIC 2 EBCDIC 3 local format
 	char work_path[MAX_ARG];//当前路径
+	void * self;//指向自身的指针
 }session_t;
 
 #define SYST_RESPONSE "UNIX Type: L8"
-#define PASV_RESPONSE "Entering passive mode(104,224,166,224,"
+#define PASV_RESPONSE "Entering passive mode(127,0,0,1,"
 #define CWD_RESPONSE "250 Command okay."
 #define SIZE_RESPONSE "213"
 #define RETR_RESPONSE "150 Opening data connection."

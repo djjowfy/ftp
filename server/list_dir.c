@@ -9,6 +9,7 @@
 #include <time.h>
 #include <grp.h>
 #include <pwd.h>
+#include "common.h"
 #include "list_dir.h"
 #include "str_utils.h"
 
@@ -24,10 +25,10 @@ const char *statbuf_get_date(struct stat *sbuf);
 const char *statbuf_get_filename(struct stat *sbuf, const char *name);
 const char *statbuf_get_user_info(struct stat *sbuf);
 const char *statbuf_get_size(struct stat *sbuf);
-static int display(const int mode, const char *path,char* send_buff);
+static int display(const int mode, const char *path,session_t * const session);
 
 /*主函数*/  
-int listDir(char * argv,char * send_buff,char *defaultPath)  
+int listDir(session_t * const session)  
 {  
     int i,j;  
     /*mode的前16个位用来标志那些能影响显示的参数，16位之后的位用来标志不影响输出格式的参数。*/  
@@ -38,9 +39,10 @@ int listDir(char * argv,char * send_buff,char *defaultPath)
     /*解析参数*/
     char *tail = NULL;
 	char *head = NULL;
+	char *left = session->data_buff;
 	mode=mode|DETAIL|ALL;
     while(1){
-		strSplit(&head,&tail,argv," ",0);
+		strSplit(&head,&tail,left," ",0);
 		if(head == NULL){
 			printf("error");
 			return -1;
@@ -68,7 +70,7 @@ int listDir(char * argv,char * send_buff,char *defaultPath)
 				flag=1; 
 			}  			 
 			if(*head!='/'){/*相对路径*/  
-			    snprintf(path,sizeof(path),"%s/%s",defaultPath,head); 
+			    snprintf(path,sizeof(path),"%s/%s",session->work_path,head); 
 			}else{/*绝对路径*/  
 				strcpy(path,head);  
 			}
@@ -76,23 +78,22 @@ int listDir(char * argv,char * send_buff,char *defaultPath)
 		if(tail == NULL){
 			break;
 		}
-		argv = tail;
+		left = tail;
 	}	
   
     if(flag==0){/*未指定任何目录或文件,则使用默认当前目录*/  
-		strcpy(path,defaultPath);  
+		strcpy(path,session->work_path);  
 	}
 	/*根据mode和路径显示文件*/
-	if(display(mode,path,send_buff) == -1){
+	if(display(mode,path,session) == -1){
 		return -1;
 	}; 	
     return 0;
 	
 }  
 
-static int display(const int mode, const char *path,char* send_buff)
+static int display(const int mode, const char *path,session_t * const session)
 {
-	memset(send_buff,'\0',sizeof(send_buff));
     DIR *dir = opendir(path);
     if(dir == NULL){
 		printf("can not open the directory\n");
@@ -101,9 +102,11 @@ static int display(const int mode, const char *path,char* send_buff)
 
     struct dirent *dr;
 	char filename[LENGTH] = {0};
+	char buf[LENGTH * 2 + 2] = {0};
     while((dr = readdir(dir)))
     {
 		memset(filename,'\0',sizeof(filename));
+		memset(buf,'\0',sizeof(buf));
 		snprintf(filename,sizeof(filename),"%s/%s",path,dr->d_name);
         //const char *filename = dr->d_name;
 		if(!(mode&ALL)){
@@ -112,7 +115,6 @@ static int display(const int mode, const char *path,char* send_buff)
 			}
 		}
 
-        char buf[1024] = {0};
         struct stat sbuf;
         if(lstat(filename, &sbuf) == -1){
 			printf("can not get stat %s\n",filename);
@@ -133,24 +135,23 @@ static int display(const int mode, const char *path,char* send_buff)
 			}else{
 				strcat(buf, statbuf_get_filename(&sbuf, filename));
 			}
-			strcat(send_buff,buf);
-			strcat(send_buff,"\r\n");	 
+			strcat(buf, "\r\n");
+			write(session->data_fd,buf,strlen(buf));	 
 		}else{
 			if(strlen(path) != 0){
 				strcat(buf, statbuf_get_filename(&sbuf, filename) + strlen(path) + 1);
 			}else{
 				strcat(buf, statbuf_get_filename(&sbuf, filename));
 			}
-		    strcat(send_buff,buf);
-			strcat(send_buff," ");
+			strcat(buf," ");
 		}       
     }
 	if(!(mode & DETAIL)){
-		strcat(send_buff,"\n");
+		strcat(buf,"\n");
 	}
 	//strcat(send_buff,"\r\n");
 	//snprintf(send_buff,sizeof(send_buff),"%s\r\n",send_buff);
-	printf("%s",send_buff);
+	printf("%s",buf);
     closedir(dir);
     return 0;
 }
