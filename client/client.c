@@ -37,4 +37,6 @@ void initial(session_t * const session){
 	memset(session->ioline, 0, sizeof(session->ioline));
 	memset(session->io_cmd, 0, sizeof(session->io_cmd));
 	memset(session->io_arg, 0, sizeof(session->io_arg));
+	memset(session->data_ip, 0, sizeof(session->data_ip));
+	session->data_port = -1;
 }

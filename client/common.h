@@ -52,6 +52,8 @@ typedef struct ftp_session
 	int pasv_listen_fd;
 	int data_fd;
     char data_buff[MAX_ARG];
+	char data_ip[32];
+	int data_port;
 	
 	//状态
 	int is_login;//登陆为1 

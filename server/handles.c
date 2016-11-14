@@ -23,7 +23,7 @@ void* recvFile(void* session);
 
 static void clearSessionCtrlData(session_t * const session);
 static void acceptResponse(session_t * const session);
-static void sendCtrlResponse(session_t * const session,const int response_code,const char* data);
+static int sendCtrlResponse(session_t * const session,const int response_code,const char* data);
 
 static void userCmdHandler(session_t * const session);
 static void passCmdHandler(session_t * const session);
@@ -131,16 +131,16 @@ static void acceptResponse(session_t * const session){
 }
 
 
-static void sendCtrlResponse(session_t * const session,const int response_code,const char* data){
+static int sendCtrlResponse(session_t * const session,const int response_code,const char* data){
    char sendbuff[1024];
    if(data == NULL){
       printf("%d\n",response_code);
 	  snprintf(sendbuff,sizeof(sendbuff),"%d\r\n",response_code);
-      write(session->ctrl_fd,sendbuff,strlen(sendbuff));
+      return(write(session->ctrl_fd,sendbuff,strlen(sendbuff)));
    }else{
      snprintf(sendbuff,sizeof(sendbuff),"%d%s%s\r\n",response_code," ",data);
      printf("%s\n",sendbuff);
-     write(session->ctrl_fd,sendbuff,strlen(sendbuff));
+     return(write(session->ctrl_fd,sendbuff,strlen(sendbuff)));
    }
 }
 
@@ -450,17 +450,36 @@ static void chatCmdHandler(session_t * const session){
 	}
 	sendCtrlResponse(session,FTP_CHATOK,NULL);
 	session_t * sess = session->pre;
+	char buffer[1024];
+	snprintf(buffer,sizeof(buffer),"%s:%s",session->name,session->arg);
 	while(sess != NULL){
-		sendCtrlResponse(sess,FTP_HASCHAT,session->arg);
+		if(sendCtrlResponse(sess,FTP_HASCHAT,buffer) > 0){
+
+		}else{
+			if(sess->pre != NULL){
+				((session_t *)sess->pre)->next = sess->next;
+				if(sess->next != NULL){
+					((session_t *)sess->next)->pre = sess->pre;
+				}
+			}
+		}		
 		sess =  sess->pre;
 
 	}
 	sess =  session->next;
 
 	while(sess != NULL){
-		sendCtrlResponse(sess,FTP_HASCHAT,session->arg);
-		sess =  sess->next;
+		if(sendCtrlResponse(sess,FTP_HASCHAT,buffer)){
 
+		}else{
+			if(sess->pre != NULL){
+				((session_t *)sess->pre)->next = sess->next;
+				if(sess->next != NULL){
+					((session_t *)sess->next)->pre = sess->pre;
+				}
+			}
+		}		
+		sess =  sess->next;
 	}
 }
 

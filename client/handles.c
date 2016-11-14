@@ -5,6 +5,9 @@
 #include "str_utils.h"
 #include "ftp_codes.h"
 #include "list_dir.h"
+#include <sys/select.h>
+#include <sys/time.h>
+#define STDIN 0
 
 typedef struct ftpcmd
 {
@@ -16,11 +19,16 @@ static void chatCmdHandler(session_t * const session);
 static void userCmdHandler(session_t * const session);
 static void passCmdHandler(session_t * const session);
 static void quitCmdHandler(session_t * const session);
+static void lsCmdHandler(session_t * const session);
+static void getFileCmdHandler(session_t * const session);
+static void sendFileCmdHandler(session_t * const session);
 static void acceptResponse(session_t * const session);
 static void clearIOBuffer(session_t * const session);
 static void acceptIOBuffer(session_t * const session);
 static void clearSessionCtrlData(session_t * const session);
 static void sendCtrlResponse(session_t * const session,const char* cmd,const char* data);
+static void get_ipaddr(session_t * const session);
+static void getRemotePWD(session_t * const session);
 
 static ftpcmd_t ctrl_cmds[] = {
 	{"ABOR",NULL},//(ABORT)此命令使服务器终止前一个FTP服务命令以及任何相关数据传输。
@@ -83,10 +91,15 @@ static ftpcmd_t ctrl_cmds[] = {
 	{"XRSQ",NULL},//
 	{"XSEM",NULL},//发送，否则邮件
 	{"XSEN",NULL},//发送到终端
-	{"CHAT",chatCmdHandler}//聊天
+	{"CHAT",chatCmdHandler},//聊天
+	{"LS",lsCmdHandler},
+	{"GET",getFileCmdHandler},
+	{"PUT",sendFileCmdHandler}
 };
 
 volatile  int recv_data_flag = 0;
+
+
 void* recv_ftp(void* session){
 	session_t * sess = session;
     while(sess->alive){
@@ -106,13 +119,323 @@ void* recv_ftp(void* session){
     return NULL;
 }
 
+static void getRemotePWD(session_t * const session){
+	if(session->is_login){
+		//while(session->modifier == 1);
+		sendCtrlResponse(session,"PWD",NULL);
+		clearSessionCtrlData(session);
+		acceptResponse(session);
+		if(strcmp(session->cmd,"257") == 0){
+			printf("%s\n",session->arg);
+		}else {
+			printf("error\n");
+		}
+	}else{
+		printf("please login first\n");
+
+	}
+}
+
+static void get_ipaddr(session_t * const session){
+  char *data;
+  strtok_r(session->arg,"(",&data);
+  char* ip[4];
+  int i;
+  for(i = 0;i < 4;i ++){
+   ip[i] = strtok_r(data,",",&data);
+  }
+  char* port_1;
+  port_1 = strtok_r(data,",",&data);
+  char * port_2_temp;
+  port_2_temp = strtok_r(data,",",&data);
+  char port_2[4];
+  memcpy(port_2,port_2_temp,strlen(port_2_temp) - 1);
+  snprintf((session->data_ip),(sizeof(session->data_ip)),"%s%s%s%s%s%s%s",ip[0],".",ip[1],".",ip[2],".",ip[3]);
+  session->data_port = atoi(port_1) * 256 + atoi(port_2);
+  printf("server data ip is : %s:%d\n",session->data_ip,session->data_port);
+}
+
+static void sendPASV(session_t * const session){
+	if(session->is_login){
+		//while(session->modifier == 1);
+		sendCtrlResponse(session,"PASV",NULL);
+		clearSessionCtrlData(session);
+		acceptResponse(session);
+		if(strcmp(session->cmd,"227") == 0){
+			get_ipaddr(session);
+		}else {
+			printf("error\n");
+		}
+	}else{
+		printf("please login first\n");
+	}
+}
+
+
+
+static void getFileCmdHandler(session_t * const session){
+	if(session->is_login){
+		getRemotePWD(session);
+		char remote_file[1024];
+		char local_pwd[1024];
+		char local_file[1024];
+		char temp_1[1024];
+		char temp_2[1024];
+		char *data;
+		char *left;
+		strSplit(&left,&data,session->io_arg," ",0);
+		//left = strtok_r(session->io_arg," ",&data);
+		int i = 0;
+		for(i = 1; i < strlen(session->arg);i ++){
+			session->arg[i - 1] = session->arg[i];
+			if(session->arg[i] == '\"'){
+				session->arg[i] = '\0';
+			}
+		}
+
+		session->arg[strlen(session->arg) - 1] = '\0';
+		if(data == NULL){
+			getcwd(local_pwd,sizeof(local_pwd));
+			snprintf(remote_file,sizeof(remote_file),"%s/%s",session->arg,session->io_arg);
+			snprintf(local_file,sizeof(local_file),"%s/%s",local_pwd,session->io_arg);
+		}else{
+			while((*data) == ' ')data ++;
+			snprintf(remote_file,sizeof(remote_file),"%s/%s",session->arg,left);
+			if((*data) == '/'){
+				if(*(data + strlen(data) - 1) == '/'){
+					
+					//printf("绝对路径，无文件名%c",*(data + strlen(data) - 1));
+					snprintf(local_file,sizeof(local_file),"%s/%s",data,left);
+				}else{
+					//printf("绝对路径，有文件名%c",*(data + strlen(data) - 1));
+					strcpy(local_file,data);
+				}
+			}else{
+				getcwd(local_pwd,sizeof(local_pwd));
+				if(*(data + strlen(data) - 1) == '/'){
+					//printf("相对路径，无文件名%c",*(data + strlen(data) - 1));
+					snprintf(local_file,sizeof(local_file),"%s/%s%s",local_pwd,data,left);
+				}else{
+					//printf("相对路径，有文件名%c",*(data + strlen(data) - 1));
+					snprintf(local_file,sizeof(local_file),"%s/%s",local_pwd,data);
+				}	
+			}
+		}
+		FILE *fp = fopen(local_file ,"w");  
+		if(NULL == fp)  
+		{  
+			printf("File:\t%s Can Not Open To Write\n",local_file );  
+			return ;  
+		}
+		//get size
+		sendCtrlResponse(session,"SIZE",remote_file);
+		clearSessionCtrlData(session);
+		acceptResponse(session);
+		if(strcmp(session->cmd,"213") == 0){
+			
+		}else {
+			printf("remote file error\n");
+			return;
+		}
+		
+		sendPASV(session);
+		if(session->data_port == -1){
+			printf("data socket error");
+			return;
+		}
+		const int data_socket = create_client_socket(session->data_ip,session->data_port);
+		sendCtrlResponse(session,"RETR",remote_file);
+		clearSessionCtrlData(session);
+		acceptResponse(session);
+		if(strcmp(session->cmd,"150") == 0){
+			char buffer[1024];
+			bzero(buffer, sizeof(buffer));  
+			int recv_count;  
+			while((recv_count = recv(data_socket, buffer, sizeof(buffer),0)) > 0)  
+			{  
+				if(fwrite(buffer, sizeof(char), recv_count, fp) < recv_count)  
+				{  
+					printf("File:\t%s Write Failed\n", local_file);  
+					fclose(fp);
+					close(data_socket);
+					return;  
+				}  
+				bzero(buffer, sizeof(buffer));  
+			}
+		}else {
+			printf("error\n");
+			fclose(fp);
+			close(data_socket);
+			return;
+		}	
+		fclose(fp);
+		printf("Receive File:\t%s From Server IP Successful!\n", local_file);
+		close(data_socket);
+	}else{
+		printf("please login first\n");
+	}
+	session->data_port = -1;
+}
+
+//put local remote
+static void sendFileCmdHandler(session_t * const session){
+	if(session->is_login){
+		getRemotePWD(session);
+		char remote_file[1024];
+		char remote_pwd[1024];
+		char local_pwd[1024];
+		char local_file[1024];
+		char temp_1[1024];
+		char temp_2[1024];
+		char *data;
+		char *left;
+		strSplit(&left,&data,session->io_arg," ",0);
+		int i = 0;
+		for(i = 1; i < strlen(session->arg);i ++){
+			session->arg[i - 1] = session->arg[i];
+			if(session->arg[i] == '\"'){
+				session->arg[i] = '\0';
+			}
+		}
+
+		session->arg[strlen(session->arg) - 1] = '\0';
+		/**************************本地路径*****************************************/
+		getcwd(local_pwd,sizeof(local_pwd));
+		if((*left) == '/'){
+			if(*(left + strlen(left) - 1) == '/'){
+				printf("only can send regular file to server");
+				return;
+				//printf("绝对路径，无文件名%c",*(data + strlen(data) - 1));
+				//snprintf(local_file,sizeof(remote_file),"%s/%s",local_pwd,left);
+			}else{
+				//printf("绝对路径，有文件名%c",*(data + strlen(data) - 1));
+				//snprintf(local_file,sizeof(local_file),"%s/%s",local_pwd,left);
+				strcpy(local_file,left);
+			}
+			}else{
+				//getcwd(local_pwd,sizeof(local_pwd));
+				if(*(left + strlen(left) - 1) == '/'){
+					//printf("相对路径，无文件名%c",*(data + strlen(data) - 1));
+					printf("only can send regular file to server");
+					return;
+					//snprintf(local_file,sizeof(local_file),"%s/%s%s",local_pwd,data,left);
+				}else{
+					//printf("相对路径，有文件名%c",*(data + strlen(data) - 1));
+					snprintf(local_file,sizeof(local_file),"%s/%s",local_pwd,left);
+				}	
+		}
+		/*******************远程路径*********************************************/	
+		if(data == NULL){
+			//无远程路径
+			//getcwd(local_pwd,sizeof(local_pwd));
+			snprintf(remote_file,sizeof(remote_file),"%s/%s",session->arg,session->io_arg);
+		}else{
+			while((*data) == ' ')data ++;
+			//snprintf(remote_file,sizeof(remote_file),"%s/%s",session->arg,left);
+			if((*data) == '/'){
+				if(*(data + strlen(data) - 1) == '/'){
+					
+					//printf("绝对路径，无文件名%c",*(data + strlen(data) - 1));
+					snprintf(remote_file,sizeof(remote_file),"%s/%s",data,left);
+				}else{
+					//printf("绝对路径，有文件名%c",*(data + strlen(data) - 1));
+					strcpy(remote_file,data);
+				}
+			}else{
+				getcwd(local_pwd,sizeof(local_pwd));
+				if(*(data + strlen(data) - 1) == '/'){
+					//printf("相对路径，无文件名%c",*(data + strlen(data) - 1));
+					snprintf(remote_file,sizeof(remote_file),"%s/%s%s",session->arg,data,left);
+				}else{
+					//printf("相对路径，有文件名%c",*(data + strlen(data) - 1));
+					snprintf(remote_file,sizeof(remote_file),"%s/%s",session->arg,data);
+				}	
+			}
+		}
+		FILE *fp = fopen(local_file, "r");  
+		if(NULL == fp)  
+		{  
+			printf("File:\t%s Can Not Open To Write\n",local_file );  
+			return ;  
+		}
+
+		
+		sendPASV(session);
+		if(session->data_port == -1){
+			printf("data socket error");
+			return;
+		}
+		const int data_socket = create_client_socket(session->data_ip,session->data_port);
+		sendCtrlResponse(session,"STOR",remote_file);
+		clearSessionCtrlData(session);
+		acceptResponse(session);
+		if(strcmp(session->cmd,"150") == 0){
+			char buffer[1024];
+			bzero(buffer, sizeof(buffer));   
+            int length = 0;  
+            while((length = fread(buffer, sizeof(char), sizeof(buffer), fp)) > 0)  
+            {  
+                if(send(data_socket, buffer, length, 0) < 0)  
+                {  
+                    printf("Send File:%s Failed./n", local_file);  
+					fclose(fp);
+					close(data_socket);
+					return; 
+                }  
+                bzero(buffer, sizeof(buffer));  
+            }  			
+		}else {
+			printf("error\n");
+			fclose(fp);
+			close(data_socket);
+			return;
+		}	
+		fclose(fp);
+		printf("Send File:\t%s To Server IP Successful!\n", local_file);
+		close(data_socket);
+	}else{
+		printf("please login first\n");
+	}
+	session->data_port = -1;
+}
+
+static void lsCmdHandler(session_t * const session){
+	if(session->is_login){
+		getRemotePWD(session);
+		sendPASV(session);
+		if(session->data_port == -1){
+			printf("data socket error");
+			return;
+		}
+		const int data_socket = create_client_socket(session->data_ip,session->data_port);
+		sendCtrlResponse(session,"LIST","-aL");
+		clearSessionCtrlData(session);
+		acceptResponse(session);
+		if(strcmp(session->cmd,"150") == 0){
+			char buffer[1024];
+			bzero(buffer, sizeof(buffer));  
+			int recv_count;  
+			 while((recv_count = recv(data_socket, buffer, sizeof(buffer),0)) > 0)  
+			{  
+				printf("%s",buffer);
+				bzero(buffer, sizeof(buffer));  
+			}
+		}else {
+			printf("error\n");
+		}	
+		close(data_socket);
+	}else{
+		printf("please login first\n");
+	}
+	session->data_port = -1;
+}
 
 static void chatCmdHandler(session_t * const session){
 	if(session->is_login){
-		while(session->modifier == 1);
+		//while(session->modifier == 1);
 		sendCtrlResponse(session,"CHAT",session->io_arg);
-		session->modifier = 0;
-		while(session->modifier == 0);
+		clearSessionCtrlData(session);
+		acceptResponse(session);
 		if(strcmp(session->cmd,"200") == 0){
 			printf("send success\n");
 		}else {
@@ -125,11 +448,10 @@ static void chatCmdHandler(session_t * const session){
 }
 static void userCmdHandler(session_t * const session){
 	session->is_login = 0;
-	while(session->modifier == 1);
 	memset(session->name,0,sizeof(session->name));
 	sendCtrlResponse(session,"USER",session->io_arg);
-	session->modifier = 0;
-	while(session->modifier == 0);
+	clearSessionCtrlData(session);
+	acceptResponse(session);
 	if(strcmp(session->cmd,"331") == 0){
 		printf("username OK,please input password(format PASS your_password)\n");
 		strcpy(session->name,session->io_arg);
@@ -143,17 +465,17 @@ static void userCmdHandler(session_t * const session){
 
 static void passCmdHandler(session_t * const session){
 	session->is_login = 0;
-	if(strlen(session->name) == 0){
-		printf("please input username\n");
-		return;
-	}
-	while(session->modifier == 1);
+	// if(strlen(session->name) == 0){
+		// printf("please input username\n");
+		// return;
+	// }
 	sendCtrlResponse(session,"PASS",session->io_arg);
-	session->modifier = 0;
-	while(session->modifier == 0);
+	clearSessionCtrlData(session);
+	acceptResponse(session);
 	if(strcmp(session->cmd,"230") == 0){
 		printf("login success\n");
 		session->is_login = 1;
+		getRemotePWD(session);
 	}else if(strcmp(session->cmd,"530") == 0){
 		printf("password error,please re input password\n");
 	}else{
@@ -219,11 +541,37 @@ static void sendCtrlResponse(session_t * const session,const char* cmd,const cha
 	//printf("send socket %d : %s",session->ctrl_fd,send_buff);
 }
 volatile int flag = 0;
-void* recv_io(void* session){
-	while(((session_t *)session)->alive){
-		while(flag);
-	    acceptIOBuffer(session);
-	    flag = 1;
+void* recv_io(void* sess){
+	int i;
+	const int size = sizeof(ctrl_cmds) / sizeof(ctrl_cmds[0]);
+	printf("%d\n",size);
+	session_t * session = sess;
+	clearIOBuffer(session);
+	acceptIOBuffer(session);
+	if(strlen(session->io_cmd) == 0){
+		return;
+	}
+	for (i=0; i<size; i++)
+	{
+		if (strcmp(ctrl_cmds[i].cmd, session->io_cmd) == 0)
+		{
+			if (ctrl_cmds[i].cmd_handler != NULL)
+			{
+				ctrl_cmds[i].cmd_handler(session);
+			}
+			else
+			{
+				//sendCtrlResponse(session, "ERROR", "Unimplement command.");
+			}
+			
+			break;
+		}
+	}
+
+	if (i == size)
+	{
+		printf("%s",session->io_cmd);
+		//sendCtrlResponse(session, "ERROR", "Unknown command.");
 	}
 
 }
@@ -233,48 +581,65 @@ int handles(session_t * const session){
 	printf("%d\n",size);
 	memset(session->data_buff,0,sizeof(session->data_buff));
 	acceptResponse(session);
-	printf("%s\n",session->arg);
+	printf("%s\nftp:>",session->arg);
+	fflush(stdin);
+	fflush(stdout);
+	//printf("ftp:>");
+	fd_set read_fd,all_fd,exception_fd;
+	FD_ZERO( &all_fd);
+	FD_ZERO( &exception_fd );
+	FD_SET( STDIN, &all_fd);
+	FD_SET( session->ctrl_fd, &all_fd);
 	pthread_t pid;
-    pthread_create(&pid,NULL,recv_ftp,(void *)session);
-	pthread_t pid_1;
-    pthread_create(&pid_1,NULL,recv_io,(void *)session);
 	while(1){
-		//LOOP :
 		if(session->alive == 0)return 0;
-		LOOP : printf("ftp:>");
-		clearIOBuffer(session);
-		while(flag == 0){
-			if(recv_data_flag == 1){
-				recv_data_flag = 0;
-				goto LOOP;
+		read_fd = all_fd;
+		select( session->ctrl_fd + 1, &read_fd, NULL, &exception_fd, NULL );
+		if ( FD_ISSET( STDIN, &read_fd ) ){
+			clearIOBuffer(session);
+			acceptIOBuffer(session);
+			if(strlen(session->io_cmd) == 0){
+				//return;
 			}
-		}
-		if(strlen(session->io_cmd) == 0){
-			flag = 0;
-			continue;
-		}
-		for (i=0; i<size; i++)
-		{
-			if (strcmp(ctrl_cmds[i].cmd, session->io_cmd) == 0)
+			for (i=0; i<size; i++)
 			{
-				if (ctrl_cmds[i].cmd_handler != NULL)
+				if (strcmp(ctrl_cmds[i].cmd, session->io_cmd) == 0)
 				{
-					ctrl_cmds[i].cmd_handler(session);
+					if (ctrl_cmds[i].cmd_handler != NULL)
+					{
+						ctrl_cmds[i].cmd_handler(session);
+					}
+					else
+					{
+						//sendCtrlResponse(session, "ERROR", "Unimplement command.");
+					}
+					
+					break;
 				}
-				else
-				{
-					//sendCtrlResponse(session, "ERROR", "Unimplement command.");
-				}
-				
-				break;
+			}
+
+			if (i == size)
+			{
+				printf("%s",session->io_cmd);
+				//sendCtrlResponse(session, "ERROR", "Unknown command.");
+			}			
+			printf("ftp:>");
+			fflush(stdin);
+			fflush(stdout);
+		}
+		if ( FD_ISSET( session->ctrl_fd, &read_fd ) ){
+			clearSessionCtrlData(session);
+			acceptResponse(session);
+			if(strcmp(session->cmd,"666") == 0){
+				recv_data_flag = 1;
+				printf("\nrecv message: %s\n",session->arg);
+				fflush(stdin);
+				fflush(stdout);
+				printf("ftp:>");
+				fflush(stdin);
+				fflush(stdout);
+				clearIOBuffer(session);
 			}
 		}
-
-		if (i == size)
-		{
-			printf("%s",session->io_cmd);
-			//sendCtrlResponse(session, "ERROR", "Unknown command.");
-		}
-		flag = 0;
 	}
 }
