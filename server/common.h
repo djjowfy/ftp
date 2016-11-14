@@ -24,10 +24,8 @@
 #define MAX_FILE_COUNT 512 //最多文件文件夹数目
 #define USERNAME "djjowfy"
 #define PASSWORD "djjowfy"
-struct user{
-  char * name;
-  char * password;
-};
+#define MAX_CLIENT 16
+
 struct simple_file{
   char path[FILE_NAME_MAX_SIZE];
   char name[FILE_NAME_MAX_SIZE];
@@ -53,6 +51,11 @@ typedef struct ftp_session
     int type;//0 ascii 1 EBCDIC 2 EBCDIC 3 local format
 	char work_path[MAX_ARG];//当前路径
 	void * self;//指向自身的指针
+	void * pre;//指向前面的指针
+	void * next;//指向后面的指针
+	
+	//身份
+	char name[100];
 }session_t;
 
 #define SYST_RESPONSE "UNIX Type: L8"
@@ -61,4 +64,11 @@ typedef struct ftp_session
 #define SIZE_RESPONSE "213"
 #define RETR_RESPONSE "150 Opening data connection."
 #define ERR_RESPONSE "500"
+
+typedef struct user{
+  char name[100];
+  char password[100];
+}user_t;
+
+user_t users[100];
 #endif

@@ -44,6 +44,6 @@ int create_server_socket(int port)
         exit(EXIT_FAILURE);
     }
 
-    listen(sock,5);
+    listen(sock,MAX_CLIENT);
     return sock;
 }

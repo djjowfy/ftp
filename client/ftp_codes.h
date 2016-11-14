@@ -95,5 +95,7 @@
 #define FTP_NOPERM            550
 #define FTP_UPLOADFAIL        553
 
+
 #define FTP_HASCHAT           666
+
 #endif /* _FTP_CODES_H_ */

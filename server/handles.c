@@ -40,6 +40,7 @@ static void retrCmdHandler(session_t * const session);
 static void storCmdHandler(session_t * const session);
 static void siteCmdHandler(session_t * const session);
 static void cdupCmdHandler(session_t * const session);
+static void chatCmdHandler(session_t * const session);
 
 //from https://zh.wikipedia.org/wiki/FTP%E5%91%BD%E4%BB%A4%E5%88%97%E8%A1%A8
 static ftpcmd_t ctrl_cmds[] = {
@@ -102,8 +103,10 @@ static ftpcmd_t ctrl_cmds[] = {
 	{"XRMD",NULL},//删除目录
 	{"XRSQ",NULL},//
 	{"XSEM",NULL},//发送，否则邮件
-	{"XSEN",NULL}//发送到终端
+	{"XSEN",NULL},//发送到终端
+	{"CHAT",chatCmdHandler}//聊天
 };
+
 
 
 
@@ -143,20 +146,30 @@ static void sendCtrlResponse(session_t * const session,const int response_code,c
 
 static void userCmdHandler(session_t * const session){
 	session->is_login = 0;
-	if(strcmp(session->arg,USERNAME) != 0){
-		sendCtrlResponse(session,FTP_LOGINERR,"User is not exit");
-	}else{
-		sendCtrlResponse(session,FTP_NEEDPWD,"User name okay,need password");
+	int i = 0;
+	for(i=0;i < (sizeof(users)/sizeof(user_t));i ++){
+		if(strcmp(session->arg,users[i].name) == 0){
+			sendCtrlResponse(session,FTP_NEEDPWD,"User name okay,need password");
+			strcpy(session->name,session->arg);
+			return;
+		}
 	}
+	sendCtrlResponse(session,FTP_LOGINERR,"User is not exit");
 }
 
 static void passCmdHandler(session_t * const session){
 	session->is_login = 0;
-	if(strcmp(session->arg,PASSWORD) != 0){
-		sendCtrlResponse(session,FTP_LOGINERR,"password is not correct");
-	}else{
-		sendCtrlResponse(session,FTP_LOGINOK,"User logged in, proceed");
-		(session->is_login) = 1;
+	int i = 0;
+	for(i=0;i < (sizeof(users)/sizeof(user_t));i ++){
+		if(strcmp(session->name,users[i].name) == 0){
+			if(strcmp(session->arg,users[i].password) != 0){
+				sendCtrlResponse(session,FTP_LOGINERR,"password is not correct");
+			}else{
+				sendCtrlResponse(session,FTP_LOGINOK,"User logged in, proceed");
+				(session->is_login) = 1;	
+			}
+			return;
+		}
 	}
 }
 
@@ -430,6 +443,27 @@ static void storCmdHandler(session_t * const session){
 	sendCtrlResponse(session,FTP_DATACONN," Here is ready");
 }
 
+static void chatCmdHandler(session_t * const session){
+	if(session->is_login == 0){
+		sendCtrlResponse(session,FTP_LOGINERR,"please login first");
+		return;
+	}
+	sendCtrlResponse(session,FTP_CHATOK,NULL);
+	session_t * sess = session->pre;
+	while(sess != NULL){
+		sendCtrlResponse(sess,FTP_HASCHAT,session->arg);
+		sess =  sess->pre;
+
+	}
+	sess =  session->next;
+
+	while(sess != NULL){
+		sendCtrlResponse(sess,FTP_HASCHAT,session->arg);
+		sess =  sess->next;
+
+	}
+}
+
 void* recvFile(void* session){
 	session_t *sess = session;
 	if(recv_file(sess->data_fd,sess->data_buff) == -1 ){
@@ -449,8 +483,9 @@ void* recvFile(void* session){
 int handles(session_t * const session){
 	int i;
 	const int size = sizeof(ctrl_cmds) / sizeof(ctrl_cmds[0]);
-	printf("%d",size);
+	printf("%d\n",size);
 	memset(session->data_buff,0,sizeof(session->data_buff));
+
 	while(1){
 		clearSessionCtrlData(session);
 		acceptResponse(session);
